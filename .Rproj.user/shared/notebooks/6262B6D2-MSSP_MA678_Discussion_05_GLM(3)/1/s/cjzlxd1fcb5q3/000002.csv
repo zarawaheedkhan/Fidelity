@@ -1,0 +1,7 @@
+"0","risky=read.csv(""https://raw.githubusercontent.com/avehtari/ROS-Examples/master/RiskyBehavior/data/risky.csv"", header = T)"
+"0",""
+"0","risky$fupacts=round(risky$fupacts)"
+"0","risky$women_alone <- as.factor(risky$women_alone)"
+"0","risky$couples <- as.factor(risky$couples)"
+"0","risky$sex <- as.factor(risky$sex)"
+"0","risky$bs_hiv <- as.factor(risky$bs_hiv)"

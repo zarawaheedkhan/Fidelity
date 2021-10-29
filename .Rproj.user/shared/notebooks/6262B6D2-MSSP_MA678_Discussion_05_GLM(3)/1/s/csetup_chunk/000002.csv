@@ -1,0 +1,28 @@
+"0","knitr::opts_chunk$set(echo = TRUE)"
+"0","pacman::p_load(""learnr"",""foreign"",""knitr"",""arm"",""ggplot2"", ""GGally"",""magrittr"",""dplyr"",""rstanarm"",""countreg"",""MASS"",""titanic"",""glmx"")"
+"2","Warning:"
+"2"," package ‘countreg’ is not available for this version of R
+
+A version of this package for your version of R might be available elsewhere,
+see the ideas at
+https://cran.r-project.org/doc/manuals/r-patched/R-admin.html#Installing-packages
+"
+"2","Warning:"
+"2"," 'BiocManager' not available.  Could not check Bioconductor.
+
+Please use `install.packages('BiocManager')` and then retry.
+"
+"2","Warning in p_install(package, character.only = TRUE, ...) :"
+"2"," 
+"
+"2","Warning in library(package, lib.loc = lib.loc, character.only = TRUE, logical.return = TRUE,  :"
+"2","
+ "
+"2"," there is no package called ‘countreg’
+"
+"2","Warning in pacman::p_load(""learnr"", ""foreign"", ""knitr"", ""arm"", ""ggplot2"",  :"
+"2","
+ "
+"2"," Failed to install/load:
+countreg
+"

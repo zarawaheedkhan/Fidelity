@@ -1,0 +1,1 @@
+"0","plot(density(warehouse_credit_cleansed$EXECUTION_CREDITS))"

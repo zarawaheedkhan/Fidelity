@@ -1,0 +1,5 @@
+"0",""
+"0","# residual plot"
+"0","yhat=predict(fit_1, type=""response"")"
+"0","plot(yhat, resid(fit_1), xlab=""predicted value"", ylab=""residual"","
+"0","     main=""Residuals vs.\ predicted values"", mgp=c(1.5,.5,0), pch=20, yaxt=""n"")"

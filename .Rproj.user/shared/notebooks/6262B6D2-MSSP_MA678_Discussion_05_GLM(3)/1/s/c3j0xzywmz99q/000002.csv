@@ -1,0 +1,2 @@
+"0","ggplot(risky)+"
+"0","  geom_histogram(aes(x=fupacts), bins = 30)"

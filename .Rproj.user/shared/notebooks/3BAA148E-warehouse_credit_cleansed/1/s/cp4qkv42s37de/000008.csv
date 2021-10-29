@@ -1,0 +1,12 @@
+"0","ave_per_warehourse <- warehouse_credit_cleansed %>% 
+  group_by(WAREHOUSE_NAME) %>%
+  transmute(ave_actual=mean(ACTUAL_CREDITS),
+            ave_excution= mean(EXECUTION_CREDITS),
+            ave_eff = mean(EFFECTIVE_EXECUTION_CREDITS)) %>%
+  distinct() %>% 
+  as.data.frame()
+"
+"2","Error: Must group by variables found in `.data`.
+* Column `WAREHOUSE_NAME` is not found.
+[90mRun `rlang::last_error()` to see where the error occurred.[39m
+"

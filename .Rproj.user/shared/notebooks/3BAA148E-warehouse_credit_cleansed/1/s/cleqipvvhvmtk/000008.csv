@@ -1,0 +1,5 @@
+"0","warehouse_credit_cleansed <- read.csv(""~/Desktop/BU-2021fall/MA675-stat pract/partner project/warehouse_credit_cleansed.csv"",header = TRUE)"
+"0",""
+"0",""
+"0","#density"
+"0","plot(density(warehouse_credit_cleansed$ACTUAL_CREDITS))"
