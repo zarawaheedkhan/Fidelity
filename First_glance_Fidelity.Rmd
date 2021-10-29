@@ -1,0 +1,467 @@
+---
+title: "First_glance_Fidelity"
+author: "Guangze Yu"
+date: "10/7/2021"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+warehouse <- read.csv("~/Downloads/warehouse_credit_cleansed.csv")
+df <- read.csv("~/Downloads/warehouse_credit_cleansed.csv")
+# 1. The meaning of the difference of starting time and ending time is 1 hour. Does this mean that the time slice is 1 hour? For the future, we will base on one hour as unit hour. Do we need to try other time unit?
+# 2. There is total 320 warehouse in total. We focus more on what part. Single warehouse really matters? Single warehouse with time series should be focused? or the whole picture. actual credit = time * payment/second
+
+ave_per_warehourse <- warehouse %>% 
+  group_by(WAREHOUSE_NAME) %>%
+  mutate(ave_actual=median(ACTUAL_CREDITS),
+            ave_excution= median(EXECUTION_CREDITS),
+            ave_eff = median(EFFECTIVE_EXECUTION_CREDITS)) %>%
+  distinct() %>% 
+  as.data.frame()
+
+
+diff <- ave_per_warehourse %>% 
+  mutate(diff_act_eff= ave_eff/ave_actual,
+         diff_act_exc= ave_excution/ave_actual)
+
+
+p2 <- ggplot(data = diff, aes(x=WAREHOUSE_NAME, y=diff_act_eff)) +
+  geom_bar(stat = "identity") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  labs(y = "Ratio between effective execution credits \n and actual credits") +
+  geom_hline(yintercept=mean(diff$diff_act_eff), color = "red") +
+  scale_y_continuous(breaks = round(sort(c(seq(min(diff$diff_act_eff), max(diff$diff_act_eff), length.out=5), mean(diff$diff_act_eff))),2))
+
+p2 + geom_hline(yintercept=1, color = "blue")+
+  scale_y_continuous(breaks = round(sort(c(seq(min(diff$diff_act_eff), max(diff$diff_act_eff), length.out=5), 1)),2))
+
+p1 <- ggplot(data = diff, aes(x=WAREHOUSE_NAME, y=diff_act_exc)) +
+  geom_bar(stat = "identity") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  labs(y = "Ratio between execution credits and actual credits") +
+  geom_hline(yintercept=mean(diff$diff_act_exc), color = "red") +
+  scale_y_continuous(breaks = round(sort(c(seq(min(diff$diff_act_exc), max(diff$diff_act_exc), length.out=5), mean(diff$diff_act_exc))),2))
+  
+
+p1 + geom_hline(yintercept=1, color = "blue")+
+  scale_y_continuous(breaks = round(sort(c(seq(min(diff$diff_act_exc), max(diff$diff_act_exc), length.out=5), 1)),2))
+```
+
+```{r}
+library(tidyverse)
+library(fastDummies)
+library(corrplot)
+library(corpcor)
+library(gapminder)
+library(scales)
+warehouse$Start_time <- as.POSIXlt(warehouse$WAREHOUSE_METERING_START_TIME)
+warehouse$Year <- format(warehouse$Start_time,format="%Y")
+warehouse <- dummy_cols(warehouse, select_columns = 'Year')
+warehouse$Month <- format(warehouse$Start_time,format="%m")
+warehouse <- dummy_cols(warehouse, select_columns = 'Month')
+warehouse$hour <- format(warehouse$Start_time,format="%H")
+
+w_2019 <- warehouse %>% 
+  group_by(WAREHOUSE_NAME) %>%
+  filter(Year_2019==1) %>% 
+  distinct(WAREHOUSE_NAME)
+ 
+w_2020 <- warehouse %>% 
+  group_by(WAREHOUSE_NAME) %>%
+  filter(Year_2020==1) %>% 
+  distinct(WAREHOUSE_NAME)
+
+w_2021 <- warehouse %>% 
+  group_by(WAREHOUSE_NAME) %>%
+  filter(Year_2021==1) %>% 
+  distinct(WAREHOUSE_NAME)
+
+list_war <- intersect(intersect(w_2019$WAREHOUSE_NAME, w_2020$WAREHOUSE_NAME), w_2021$WAREHOUSE_NAME)
+
+acros_data <- warehouse %>%
+  filter(WAREHOUSE_NAME %in% list_war)
+
+match_full <- diff %>% 
+  filter(WAREHOUSE_NAME %in% acros_data$WAREHOUSE_NAME) %>%
+  select(ACTUAL_CREDITS,EXECUTION_CREDITS,EFFECTIVE_EXECUTION_CREDITS) %>%
+  rename(actual=ACTUAL_CREDITS,
+         execution= EXECUTION_CREDITS,
+         effective=EFFECTIVE_EXECUTION_CREDITS)
+
+# Correlation plot
+corrplot(cor(match_full), type = "upper",method = "number")
+cor2pcor(cov(match_full))
+
+
+# Consider to have PCA analysis
+
+
+warehouse %>% group_by(WAREHOUSE_NAME) %>% summarise(w_2019)
+
+usage_time <- warehouse %>% 
+  group_by(WAREHOUSE_NAME) %>%
+  summarise(n=n()) 
+
+summary(usage_time)
+
+  ggplot(usage_time, aes( y=n)) + 
+  geom_boxplot()
+
+### divide into 4 parts.  
+usage_time <- usage_time%>%
+  mutate(quantile = ntile(n, 4))
+
+ggplot(usage_time, aes(x=quantile, y=n,group=quantile)) + 
+  geom_boxplot() + 
+  theme_minimal() +
+  labs(title="Plot of total usage time vs 4 quantile",x="", y = "Total usage hours") +
+  scale_x_discrete(limits=c("Q1", "Q2", "Q3","Q4")) +
+  stat_summary(fun.y="mean")+
+  theme(legend.position = "none")
+
+  
+quantile_list <- diff %>% 
+  select(WAREHOUSE_NAME,diff_act_exc) %>%
+  distinct() %>%
+  mutate(quantile = ntile(diff_act_exc, 4)) 
+
+quantile_list_1 <- quantile_list %>% filter(quantile =="1")
+quantile_list_2 <- quantile_list %>% filter(quantile =="2")
+quantile_list_3 <-quantile_list %>% filter(quantile =="3")
+quantile_list_4 <-quantile_list %>% filter(quantile =="4")
+
+
+#### summary of the ratio of diff_act_exc
+ggplot(a, aes(x=quantile, y = diff_act_exc,group=quantile)) + 
+  geom_boxplot()+
+  facet_wrap(~quantile, scale="free") +  
+  theme_minimal() +
+  labs(title="Summary of Ratio of excution and actual by quantile groups",x="", y = "Ratio of execution and actual credits") +
+  stat_summary(fun.y="mean")+
+  theme(legend.position = "none")
+
+
+  
+quantile_list_1_info<- diff %>% 
+  filter(WAREHOUSE_NAME %in% quantile_list_1$WAREHOUSE_NAME) %>%
+  group_by(Start_time) %>%
+  mutate(sum_act= sum(ACTUAL_CREDITS),sum_exe= sum(EXECUTION_CREDITS)) %>%
+  select(Start_time,sum_act,sum_exe) %>%
+  distinct()
+
+
+
+quantile_list_2_info <- diff %>% 
+  filter(WAREHOUSE_NAME %in% quantile_list_2$WAREHOUSE_NAME) %>%
+  group_by(Start_time) %>%
+  mutate(sum_act= sum(ACTUAL_CREDITS),sum_exe= sum(EXECUTION_CREDITS)) %>%
+  select(Start_time,sum_act,sum_exe) %>%
+  distinct()
+
+quantile_list_3_info <- diff %>% 
+  filter(WAREHOUSE_NAME %in% quantile_list_3$WAREHOUSE_NAME) %>%
+  group_by(Start_time) %>%
+  mutate(sum_act= sum(ACTUAL_CREDITS),sum_exe= sum(EXECUTION_CREDITS)) %>%
+  select(Start_time,sum_act,sum_exe) %>%
+  distinct()
+
+quantile_list_4_info <- diff %>% 
+  filter(WAREHOUSE_NAME %in% quantile_list_4$WAREHOUSE_NAME) %>%
+  group_by(Start_time) %>%
+  mutate(sum_act= sum(ACTUAL_CREDITS),sum_exe= sum(EXECUTION_CREDITS)) %>%
+  select(Start_time,sum_act,sum_exe) %>%
+  distinct()
+
+summary(quantile_list_1_info)
+summary(quantile_list_2_info)
+summary(quantile_list_3_info)
+summary(quantile_list_4_info)
+
+
+##### Plot of sum credits by Q1 group
+quantile_list_1_info$Start_time <- as.POSIXct(quantile_list_1_info$Start_time,format = "%y%m%d %H:%M:%S")
+quantile_list_1_info<- reshape2::melt(quantile_list_1_info, id.var='Start_time')
+
+ggplot() +
+  geom_line(quantile_list_1_info, mapping=aes(x=Start_time, y=value, col=variable))+
+  theme_minimal() +
+  labs(title="Plot of sum credits by Q1 group",x="", y = "Total sum of credits") +
+  scale_x_datetime(date_breaks = "2 month",date_labels = "%b%d") +
+  labs(color="Credits")
+
+##### Plot of sum credits by Q2 group
+quantile_list_2_info$Start_time <- as.POSIXct(quantile_list_2_info$Start_time,format = "%y%m%d %H:%M:%S")
+quantile_list_2_info<- reshape2::melt(quantile_list_2_info, id.var='Start_time')
+
+ggplot() +
+  geom_line(quantile_list_2_info, mapping=aes(x=Start_time, y=value, col=variable))+
+  theme_minimal() +
+  labs(title="Plot of sum credits by Q2 group",x="", y = "Total sum of credits") +
+  scale_x_datetime(date_breaks = "2 month",date_labels = "%b%d") +
+  labs(color="Credits")
+
+
+
+##### Plot of sum credits by Q3 group
+quantile_list_3_info$Start_time <- as.POSIXct(quantile_list_3_info$Start_time,format = "%y%m%d %H:%M:%S")
+quantile_list_3_info<- reshape2::melt(quantile_list_3_info, id.var='Start_time')
+
+ggplot() +
+  geom_line(quantile_list_3_info, mapping=aes(x=Start_time, y=value, col=variable))+
+  theme_minimal() +
+  labs(title="Plot of sum credits by Q3 group",x="", y = "Total sum of credits") +
+  scale_x_datetime(date_breaks = "2 month",date_labels = "%b%d") +
+  labs(color="Credits")
+
+
+##### Plot of sum credits by Q4 group
+quantile_list_4_info$Start_time <- as.POSIXct(quantile_list_4_info$Start_time,format = "%y%m%d %H:%M:%S")
+quantile_list_4_info<- reshape2::melt(quantile_list_4_info, id.var='Start_time')
+
+ggplot() +
+  geom_line(quantile_list_4_info, mapping=aes(x=Start_time, y=value, col=variable))+
+  theme_minimal() +
+  labs(title="Plot of sum credits by Q3 group",x="", y = "Total sum of credits") +
+  scale_x_datetime(date_breaks = "2 month",date_labels = "%b%d") +
+  labs(color="Credits")
+```
+
+```{r}
+warehouse$Start_time <- as.POSIXlt(warehouse$WAREHOUSE_METERING_START_TIME)
+warehouse$Year <- format(warehouse$Start_time,format="%Y")
+warehouse <- dummy_cols(warehouse, select_columns = 'Year')
+warehouse$Month <- format(warehouse$Start_time,format="%m")
+warehouse <- dummy_cols(warehouse, select_columns = 'Month')
+warehouse$hour <- format(warehouse$Start_time,format="%H")
+warehouse <- dummy_cols(warehouse, select_columns = 'hour')
+warehouse$Day <- format(warehouse$Start_time,format="%d")
+warehouse <- dummy_cols(warehouse, select_columns = 'Day')
+
+w_2019 <- warehouse %>% 
+  group_by(WAREHOUSE_NAME) %>%
+  filter(Year_2019==1) %>% 
+  distinct(WAREHOUSE_NAME)
+ 
+w_2020 <- warehouse %>% 
+  group_by(WAREHOUSE_NAME) %>%
+  filter(Year_2020==1) %>% 
+  distinct(WAREHOUSE_NAME)
+
+w_2021 <- warehouse %>% 
+  group_by(WAREHOUSE_NAME) %>%
+  filter(Year_2021==1) %>% 
+  distinct(WAREHOUSE_NAME)
+
+list_war <- intersect(intersect(w_2019$WAREHOUSE_NAME, w_2020$WAREHOUSE_NAME), w_2021$WAREHOUSE_NAME)
+
+acros_data <- warehouse %>%
+  filter(WAREHOUSE_NAME %in% list_war)
+
+a <- warehouse %>% 
+  filter(WAREHOUSE_NAME %in% acros_data$WAREHOUSE_NAME) %>%
+  select(-SNAPSHOT_TS,-WAREHOUSE_NAME,-WAREHOUSE_METERING_START_TIME,-WAREHOUSE_METERING_END_TIME,-Year,-Start_time,-Month,-hour,-Day)
+
+pca <- prcomp(a)
+pca_timeseries <- data.frame(a %*% pca$rotation) 
+
+```
+
+```{r}
+library(prophet)
+useful <-acros_data %>% 
+  filter(WAREHOUSE_NAME=="e42a21574ad7c8ba31fb298dcae830bbe88b5a22a80541d699626f6d88ca4b56")
+
+df <- useful %>% select(Start_time,ACTUAL_CREDITS) %>% rename(y=ACTUAL_CREDITS,ds=Start_time)
+m <- prophet(df, changepoint.prior.scale=0.01)
+future <- make_future_dataframe(m, periods = 300, freq = 60 * 60)
+fcst <- predict(m, future)
+plot(m, fcst) + add_changepoints_to_plot(m)
+# prophet_plot_components(m, fcst) 
+
+```
+
+```{r}
+df <- read.csv("~/Downloads/warehouse_credit_cleansed.csv")
+df <- arrange(df, WAREHOUSE_NAME)
+# create new ID
+ids <-distinct(data.frame(df$WAREHOUSE_NAME)) %>% rename(WAREHOUSE_NAME = df.WAREHOUSE_NAME )
+ID_CROSSWALK <- ids %>% mutate( NEWID = row_number())
+df <- full_join(df,ID_CROSSWALK, by ="WAREHOUSE_NAME")
+df <- df[,c("NEWID","WAREHOUSE_METERING_START_TIME", "ACTUAL_CREDITS", "EXECUTION_CREDITS", "EFFECTIVE_EXECUTION_CREDITS")]
+df <- arrange(df, NEWID, WAREHOUSE_METERING_START_TIME)
+
+# wipe out duplicated data
+dup.no <- which(duplicated(df[, c("NEWID","WAREHOUSE_METERING_START_TIME")]))
+dup.list <- df[, c("NEWID","WAREHOUSE_METERING_START_TIME")][dup.no, ]
+
+
+
+dup.check <- data.frame(matrix(nrow = 0 , ncol = 5))
+colnames(dup.check ) <- colnames(df)
+for(i in 1:length(dup.list$NEWID)){
+dup.check <- rbind(dup.check, filter(df, NEWID == dup.list$NEWID[i] & WAREHOUSE_METERING_START_TIME == dup.list$WAREHOUSE_METERING_START_TIME[i]))
+}
+df <- df[-dup.no, ]
+
+# Change the time element and extract time element. 
+library(lubridate)
+df$Start_time <- as.POSIXlt(df$WAREHOUSE_METERING_START_TIME)
+df$Year <- format(df$Start_time,format="%Y")
+df$Month <- format(df$Start_time,format="%m")
+df$hour <- format(df$Start_time,format="%H")
+df$Day <- format(df$Start_time,format="%d")
+df$Week <- week(df$Start_time)
+
+# Get the weekly sum of acual credits, execution, and effective credits. 
+weekly <- df %>% 
+  group_by(Year,Week,NEWID) %>%
+  mutate(sum_actual= sum(ACTUAL_CREDITS),
+         sum_exe= sum(EXECUTION_CREDITS),
+         sum_eff = sum(EFFECTIVE_EXECUTION_CREDITS))%>%
+  do(data.frame(sum_actual=sort(.$sum_actual),
+                sum_exe=sort(.$sum_exe),
+                sum_eff= sort(.$sum_eff))) %>%
+  distinct()
+
+# Get the deriavate of each point. 
+
+weekly_change_rate <- weekly %>% 
+  group_by(NEWID) %>%
+  mutate(chang_act= sum_actual-lag(sum_actual),
+         chang_exe= sum_exe-lag(sum_exe),
+         chang_eff= sum_eff-lag(sum_eff))
+
+# remove those observation only with 1 week data. 
+weekly_change_rate<- weekly_change_rate %>% 
+  group_by(NEWID) %>% 
+  mutate(count = n()) %>% 
+  filter(count!= 1)
+
+# Function to get outliers. 
+fun <- function(x){
+  y = abs(x) > 2*IQR(x,na.rm = TRUE)
+  return(y)
+}
+
+# Get the abnormal label. 
+label_list_out<- weekly_change_rate %>%
+  group_by(NEWID) %>%
+  mutate(flag= case_when(fun(chang_act) ~ 1,
+                         TRUE ~ 0)) 
+
+# get the gap lag week point.
+lag_list <- df %>%
+  mutate(label_lag= case_when(DAY_DIFF >7 ~1)) %>%
+  filter(label_lag=="1") %>%
+  select(-WAREHOUSE_NAME,-WAREHOUSE_METERING_START_TIME)
+
+# get the specific information of abnormal points and gap point. 
+list_abnormal <- anti_join(label_list_out,lag_list)
+
+
+
+# Visulize warehouse 318. Random pick. 
+out <-list_abnormal %>% 
+  filter(NEWID ==318)
+
+# No gap point for ware house 318. 
+
+norm <- df %>% 
+  filter(NEWID ==318) %>%
+  group_by(Week,Year) %>%
+  mutate(sum_actual= sum(ACTUAL_CREDITS),
+         sum_exe= sum(EXECUTION_CREDITS),
+         sum_eff = sum(EFFECTIVE_EXECUTION_CREDITS)) %>%
+  distinct(NEWID, Year,Week, .keep_all = TRUE)
+
+norm $Year_week <- paste(norm$Year, norm$Week)
+out $Year_week <- paste(out$Year, out$Week)
+
+out <- norm %>% 
+  mutate(label=case_when(
+  Year_week %in% out$Year_week ~1)) %>%
+  filter(label==1)
+  
+p <- ggplot(norm,aes(x=as.Date(Start_time),y=sum_actual))+geom_line()
+p + geom_point(out,mapping=aes(x=as.Date(Start_time),y=sum_actual,col="red"))
+
+
+# Visulize warehouse 238. Random pick.
+
+full <- label_list_out %>% filter(NEWID==261)
+
+full <- full_join(lag_list%>%filter(NEWID ==261),label_list_out%>%filter(NEWID ==261))
+full $Year_week <- paste(full$Year, full$Week)
+full <- full_join(full,norm_1,by=c("Year_week"))
+
+lag_list_1 <- full %>%
+  mutate(label_lag= case_when(DAY_DIFF >7 ~1)) %>%
+  select(-WAREHOUSE_NAME,-WAREHOUSE_METERING_START_TIME)
+
+gap_point <- lag_list_1 %>%
+  filter(label_lag =="1" & flag =="1")
+
+
+norm_1 <- df %>% 
+  filter(NEWID ==261) %>%
+  group_by(Week,Year) %>%
+  mutate(sum_actual= sum(ACTUAL_CREDITS),
+         sum_exe= sum(EXECUTION_CREDITS),
+         sum_eff = sum(EFFECTIVE_EXECUTION_CREDITS)) %>%
+  distinct(NEWID, Year,Week, .keep_all = TRUE)
+
+norm_1 $Year_week <- paste(norm_1$Year, norm_1$Week)
+out_1 $Year_week <- paste(out_1$Year, out_1$Week)
+
+out_1 <- norm_1 %>% 
+  mutate(label=case_when(
+  Year_week %in% full$Year_week ~1)) 
+  
+p_1 <- ggplot(norm_1,aes(x=as.Date(Start_time),y=sum_actual))+geom_line()
+p_2 <- p_1 + geom_point(lag_list_1,mapping=aes(x=as.Date(Start_time),y=sum_actual.x,col="blue"))
+p_2+geom_point(gap_point,mapping=aes(x=as.Date(Start_time),y=sum_actual.y,col="red"))
+
+
+for (y in 2019:2021){
+  a <- label_list_out %>%
+      filter(year==y)
+ for (i in 1:52){
+   # i <- 53
+       a1 <- a %>%
+         filter(flag == 1 & Week==i)
+       ID1 <- a1$NEWID
+       m <- i+1
+       aA <- a %>%
+         filter(Week==m)
+       aA1 <- aA[aA$NEWID %in% ID1,]
+       #bestAvgEfi=mean(aA1$averageEfficiency)
+       sum_actual_1 <- aA1$sum_actual_1
+       result[nrow(result) + 1,] = c(y, i, sum_actual_1)
+       } 
+}
+# get the Week id
+label_list_out <- label_list_out %>% 
+  group_by(NEWID) %>%
+  mutate(week_number = row_number())
+
+
+
+label_list_out[!(label_list_out$flag == 1 & c(label_list_out$flag[-1], 0) != 1), ]
+
+norm %>% 
+  mutate(label=case_when(
+  Year_week %in% out_1$Year_week ~1))
+
+
+full <- full_join(lag_list%>%filter(NEWID ==261),label_list_out%>%filter(NEWID ==261))
+
+```
+
+
