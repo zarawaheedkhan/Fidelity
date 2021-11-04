@@ -16,7 +16,7 @@ x2 <- vector()
 for (i in 1:730){
   x2[i]<- x1[i,1]
 }
-x2 <- as.numeric(x2)
+#x2 <- as.numeric(x1)
 ```
 
 ## SSA
@@ -54,4 +54,56 @@ plot(reconstruct(s, groups = list(G12 = 1, G4 = 2:5,
 ```
 Computed:
 Eigenvalues: 30,	Eigenvectors: 30,	Factor vectors: 0
+
+## contrst 2 warehouse
+```{r}
+y <- filter(df_day,NEWID==9)
+y$date <- paste(y$year,y$day)
+y1 <- filter(df_day,NEWID==33)
+y1$date <- paste(y1$year,y1$day)
+cons <- inner_join(y1,y,by="date")
+cons1 <- cons[,c(1,8,6,13)]
+```
+
+```{r}
+cons2 <- cons[,c(6,13)]
+norm.cons2n <- sqrt(colMeans(cons2^2))
+cons2n <-sweep(cons2, 2, norm.cons2n, "/")
+L <- 30
+s.cons2n <- ssa(cons2n, L = L, kind = "mssa")
+s.cons2 <- ssa(cons2, L = L, kind = "mssa")
+r.cons2n <- reconstruct(s.cons2n, groups = list(Trend = c(1, 12, 14), Seasonality = c(2:11, 13)))
+r.cons2 <- reconstruct(s.cons2, groups = list(Trend = 1, Seasonality = 2:11))
+
+wrap.plot <- function(rec, component = 1, series, ...){
+  plot(rec, add.residuals = FALSE, add.original = TRUE,
+     plot.method = "matplot", superpose = TRUE, 
+     scales = list(y = list(tick.number = 3)), 
+     slice = list(component = component, series = series),
+     auto.key = "",...)}
+#plot(r.cons2n,add.original = TRUE)
+
+trel1 <- wrap.plot(r.cons2n, series = 2, main = NULL)
+trel2 <- wrap.plot(r.cons2n, series = 1, ylab = "Fort, norm", main = NULL)
+trel3 <- wrap.plot(r.cons2, series = 2, ylab = "Rose", main = NULL) 
+trel4 <- wrap.plot(r.cons2, series = 1, ylab = "Fort", main = NULL)
+
+plot(trel1, split = c(1, 1, 2, 2), more = TRUE)
+plot(trel2, split = c(1, 2, 2, 2), more = TRUE)
+plot(trel3, split = c(2, 1, 2, 2), more = TRUE)
+plot(trel4, split = c(2, 2, 2, 2))
+
+
+
+```
+
+## test 
+```{r}
+library(dplyr)
+load("AustralianWine.rda")
+AustralianWine<-AustralianWine
+
+```
+
+
 
