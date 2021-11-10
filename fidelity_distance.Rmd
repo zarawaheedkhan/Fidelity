@@ -1,0 +1,138 @@
+---
+title: "fidelity_distance"
+author: "Guangze Yu"
+date: "11/7/2021"
+output: html_document
+---
+
+```{r,message=FALSE}
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+# open XQuartz
+library(TSdist)
+library(lubridate)
+library(tibble)
+library(factoextra)
+# Have to input into the project environment.
+source("Input_Zeros.R")
+```
+
+
+```{r}
+### daily data
+dtw_function <- function(x,begin,end,warehouse_number){
+  # change date column into date format
+  x$date <-as.Date(x$date)
+  # select the time range
+  x <- x[x$date >=begin_date & x$date<= end_date,]
+  # select the number of warehouse from 1 to 320 ????
+  x <- x[x$NEWID<=warehouse_number,]
+  # Get ready for time series matrix: each row represent each warehouse, each column represnts one time spot
+  x <- split(x$sum, x$NEWID) %>% unlist()
+  x <- matrix(x,nrow = warehouse_number)
+  # calcaute the time series distance 
+  # The choice of window.size means how much the mapping (small adjustment?)
+  da=dist(x, method="TSDistances", distance="dtw",window.size=7, diag=TRUE, upper=TRUE)
+  return(da)
+}
+# find dtw matrix
+result <- dtw_function(actual_daily,"2021-03-29","2021-07-04",320)
+
+result_b <- dtw_function(b,"2021-03-29","2021-07-04",)
+
+# ######### Different cluster method: K-mean cluster, hierarchical cluster
+############### K-mean cluster
+# choose the centers manually
+k2 <- kmeans(result, centers = 3, nstart = 25)
+fviz_cluster(k2, data = result)
+# function to compute total within-cluster sum of square 
+wss <- function(k) {
+  kmeans(result, k, nstart = 25)$tot.withinss
+}
+# Compute and plot wss for k = 1 to k = 5
+k.values <- 1:5
+
+# extract wss for 2-15 clusters
+wss_values <- map_dbl(k.values, wss)
+
+# plot to find the best cluster number 
+######### don't have to run
+plot(k.values, wss_values,
+       type="b", pch = 19, frame = FALSE, 
+       xlab="Number of clusters K",
+       ylab="Total within-clusters sum of squares")
+######### don't have to run
+
+############### hierarchical cluster
+plot(hclust(result))
+# No need for changing k
+fit <- cmdscale(result,eig=TRUE, k=2)
+x <- fit$points[,1]
+y <- fit$points[,2]
+# Project the distance matrix to 2D plot. 
+plot(x, y, xlab="Coordinate 1", ylab="Coordinate 2",
+  main="Metric MDS")
+
+### warehouse 48, 1,2 
+
+actual_daily$date <-as.Date(actual_daily$date)
+
+b <- actual_daily %>% 
+  filter(NEWID==264) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+plot(b$sum,type="l")
+
+
+b <- actual_daily %>% filter(!NEWID %in% c(48,1,2,264,297,298,184))
+```
+
+
+```{r}
+a <- actual_daily 
+#%>%
+  #select(NEWID,sum) 
+#%>%filter(NEWID<20)
+a<-a[a$NEWID<=20,]
+## need to conside the curse of dimensionality 
+## reduce dimensions
+#dist(a, method="TSDistances", distance="tquest",tau=mean(a), diag=TRUE, upper=TRUE)
+
+
+a <- split(a$sum, a$NEWID) %>% unlist()
+a <- matrix(a,nrow = 20)
+
+da=dist(a, method="TSDistances", distance="dtw",window.size=7, diag=TRUE, upper=TRUE)
+
+
+plot(hclust(da))
+fit <- cmdscale(da,eig=TRUE, k=2)
+x <- fit$points[,1]
+y <- fit$points[,2]
+plot(x, y, xlab="Coordinate 1", ylab="Coordinate 2",
+  main="Metric MDS")
+#text(x, y, labels = row.names(mydata), cex=.7)
+
+dtw_function <- function(x){
+  x <- x %>% select(NEWID,sum)
+  x <- split(x$sum, x$NEWID) %>% unlist()
+  x <- matrix(x,nrow = 320)
+  distance_matrix <- dist(x, method="TSDistances", distance="dtw", diag=TRUE, upper=TRUE,window.size=7)
+  return(distance_matrix)
+}
+
+result <- dtw_function(actual_daily)
+
+
+
+# try to chop for single 1 month
+# try to use this single month to project for other months
+```
+
+
+```{r}
+library(autoencoder)
+```
+
+
