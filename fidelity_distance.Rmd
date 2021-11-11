@@ -15,41 +15,66 @@ library(TSdist)
 library(lubridate)
 library(tibble)
 library(factoextra)
-# Have to input into the project environment.
+library(rbenchmark)
+# Have to input into the project environment before running else.
 source("Input_Zeros.R")
 ```
 
 
 ```{r}
 ### daily data
-dtw_function <- function(x,begin,end,warehouse_number){
+dtw_function <- function(x,begin,end){
   # change date column into date format
   x$date <-as.Date(x$date)
   # select the time range
   x <- x[x$date >=begin_date & x$date<= end_date,]
   # select the number of warehouse from 1 to 320 ????
-  x <- x[x$NEWID<=warehouse_number,]
+  # x <- x[x$NEWID<=warehouse_number,]
   # Get ready for time series matrix: each row represent each warehouse, each column represnts one time spot
+  id_x <- unique(x$NEWID)
   x <- split(x$sum, x$NEWID) %>% unlist()
-  x <- matrix(x,nrow = warehouse_number)
+  x <- matrix(x,nrow = length(id_x))
   # calcaute the time series distance 
   # The choice of window.size means how much the mapping (small adjustment?)
-  da=dist(x, method="TSDistances", distance="dtw",window.size=7, diag=TRUE, upper=TRUE)
+  da = dist(x, method="TSDistances", distance="dtw",window.size=7, diag=TRUE, upper=TRUE)
+  da <- as.data.frame(as.matrix(da))
+  row.names(da) <- unique(id_x)
   return(da)
 }
 # find dtw matrix
-result <- dtw_function(actual_daily,"2021-03-29","2021-07-04",320)
+# result <- dtw_function(actual_daily,"2021-03-29","2021-07-04",320)
 
-result_b <- dtw_function(b,"2021-03-29","2021-07-04",)
+result_b <- dtw_function(b,"2021-03-29","2021-07-04")
 
-# ######### Different cluster method: K-mean cluster, hierarchical cluster
+########## Benchmark approxiate time range
+benchmark(
+  "1 month 5 warehouse" = {
+  result_b <- dtw_function(b,"2021-06-04","2021-07-04")
+  },
+  "1 quarter 5 warehouse"= {
+  result_b <- dtw_function(b,"2021-04-04","2021-07-04")
+  },
+  "1 month 20 warehouse" = {
+  result_b <- dtw_function(c,"2021-06-04","2021-07-04")
+  },
+  "1 quarter 20 warehouse"= {
+  result_b <- dtw_function(c,"2021-04-04","2021-07-04")
+  },
+  columns = c("test", "elapsed","relative", "user.self", "sys.self")
+)
+
+
+
+
+
+########## Different cluster method: K-mean cluster, hierarchical cluster
 ############### K-mean cluster
 # choose the centers manually
-k2 <- kmeans(result, centers = 3, nstart = 25)
-fviz_cluster(k2, data = result)
+k2 <- kmeans(result_b, centers = 3, nstart = 25)
+fviz_cluster(k2, data = result_b)
 # function to compute total within-cluster sum of square 
 wss <- function(k) {
-  kmeans(result, k, nstart = 25)$tot.withinss
+  kmeans(result_b, k, nstart = 25)$tot.withinss
 }
 # Compute and plot wss for k = 1 to k = 5
 k.values <- 1:5
@@ -66,9 +91,14 @@ plot(k.values, wss_values,
 ######### don't have to run
 
 ############### hierarchical cluster
-plot(hclust(result))
+# plot(hclust(result_b)) ## doesn't work for dataframe
+hclustfunc <- function(x) hclust(x, method="complete")
+distfunc <- function(x) as.dist((1-cor(t(x)))/2)
+d <- distfunc(result_b)
+fit <- hclustfunc(d)
+plot(fit)
 # No need for changing k
-fit <- cmdscale(result,eig=TRUE, k=2)
+fit <- cmdscale(result_b,eig=TRUE, k=2)
 x <- fit$points[,1]
 y <- fit$points[,2]
 # Project the distance matrix to 2D plot. 
@@ -76,20 +106,36 @@ plot(x, y, xlab="Coordinate 1", ylab="Coordinate 2",
   main="Metric MDS")
 
 ### warehouse 48, 1,2 
-
+#### Playground and plot stuffs, 
 actual_daily$date <-as.Date(actual_daily$date)
 
 b <- actual_daily %>% 
-  filter(NEWID==264) %>%
+  filter(NEWID==48) %>%
   filter(date>= "2021-03-29" & date <="2021-07-04")
-plot(b$sum,type="l")
+
+c <- actual_daily %>% 
+  filter(NEWID==226) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+
+e <- actual_daily %>% 
+  filter(NEWID==1) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
 
 
-b <- actual_daily %>% filter(!NEWID %in% c(48,1,2,264,297,298,184))
+hh <- as.data.frame(cbind(c(1:98),c$sum,b$sum,e$sum))
+ggplot(hh, aes(x=V1,y = V2)) +
+    geom_line(aes(x = V1, y = V2), color = 'black') +
+    geom_line(aes(x = V1, y = V3), color = 'red') +
+    geom_line(aes(x = V1, y = V4), color = 'yellow')
+
+
+b <- actual_daily %>% filter(!NEWID %in% c(48,1,2,47,46,45))
+c <- actual_daily %>% filter(NEWID %in% c(1:20))
 ```
 
 
 ```{r}
+# Playground also don't run
 a <- actual_daily 
 #%>%
   #select(NEWID,sum) 
