@@ -44,48 +44,6 @@ for(i in 1:length(dup.list$NEWID)){
   dup.check <- rbind(dup.check, filter(df, NEWID == dup.list$NEWID[i] & WAREHOUSE_METERING_START_TIME == dup.list$WAREHOUSE_METERING_START_TIME[i]))
 }
 df <- df[-dup.no, ]
-
- #  df1$WAREHOUSE_METERING_START_TIME <- as.character(as_datetime(df1$WAREHOUSE_METERING_START_TIME))
- # arrange(count(df, NEWID), desc(n))
-# dup.list = data.frame(matrix(, nrow = 0, ncol = 2))
-# for(i in 1: dim(dup.check)[1]){
-#   # i = 1
-#   dup.list = rbind(filter(ID_CROSSWALK, NEWID == dup.check$NEWID[i]), dup.list)
-# }
-# dup.list <- distinct(dup.list)
-
-#######  currently not run
-# create the complete time line from 2019/08/01/00:00:00 to 2021/08/02/05:00:00
-# out <- ISOdatetime(2019,07,31,20,0,0) + (0:17573) *60*60
-# attr(out, "tzone") <- "UTC" 
-# time_index <- as.character(out)
-# time_index[17574]
-# # cast ACTUAL, EXECUTION, EFFECTIVE EXECUTION CREDITS of 'df' onto created time index
-# df_actual <- dcast(df, NEWID ~ WAREHOUSE_METERING_START_TIME, value.var = "ACTUAL_CREDITS")
-# df_execution <- dcast(df, NEWID ~ WAREHOUSE_METERING_START_TIME, value.var = "EXECUTION_CREDITS")
-# df_effective_execution <- dcast(df, NEWID ~ WAREHOUSE_METERING_START_TIME, value.var = "EFFECTIVE_EXECUTION_CREDITS")
-# 
-# ##########
-# add_time <- function(df, timeline){
-#   # df <- df_actual
-#   # timeline <- time_index
-#   output <- data.frame(matrix(, nrow = dim(df)[1], ncol = length(timeline)))
-#   colnames(output) <- timeline
-#   for (j in 1: length(timeline)) {
-#     if(is.element(timeline[j], colnames(df))){
-#        output[, j] <- df[, match(timeline[j], colnames(df))]
-#     }else{
-#       output[, j] <- output[, j]
-#     }
-#   }
-#   output <- cbind(NEWID = df[, c("NEWID")], output)
-#   return(output)
-# }
-# ###
-# subset(df_actual, NEWID == 283)
-# df_actual <- add_time(df_actual, timeline = time_index)
-# df_execution <- add_time(df_execution, timeline = time_index)
-# df_effective_execution <- add_time(df_effective_execution, timeline = time_index)
 ```
 
 
@@ -96,10 +54,6 @@ df$year <- year(df$WAREHOUSE_METERING_START_TIME)
 df$month <- month(df$WAREHOUSE_METERING_START_TIME)
 df$week <- week(df$WAREHOUSE_METERING_START_TIME)
 df$day <- yday(df$WAREHOUSE_METERING_START_TIME)
-# df$year<- as.character(df$year)
-# df$month <- as.character(df$month)
-# df$week <- as.character(df$week)
-# df$day <-  as.character(df$day)
 
 ## creat day unit dataset
 df_day <- df %>%
