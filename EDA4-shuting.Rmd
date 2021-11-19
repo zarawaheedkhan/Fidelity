@@ -1,0 +1,114 @@
+---
+title: "EDA4"
+output: html_document
+---
+compare grouping method
+distance between time series(clustering method)
+for the long term, ...
+what we have done.
+or regroup
+next week: 1.choose a time period(1 month), 2.compare all warehouses 3. group warehouse based on trend and score(.) 4.find some stationary
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+x <- filter(df_day,NEWID==283)
+x1 <- x[,c(6)]
+x2 <- vector()
+for (i in 1:730){
+  x2[i]<- x1[i,1]
+}
+#x2 <- as.numeric(x1)
+```
+
+## SSA
+```{r}
+library(Rssa)
+## matrix:30*701,xxt 30*30, number of eigenvalues is 30. DECOMPOSITION.
+s <- ssa(x2, L = 30, neig = NULL, kind = "1d-ssa", svd.method = "eigen")
+summary(s)
+plot(s)
+s$sigma#singular values
+280.007534/sum(s$sigma)
+# s$U
+# s$V
+plot(s, type = "vectors", idx = 1:15) #two main eigenvalue are trends, what is it?
+#Reconstruct into 2 series
+r <- reconstruct(s, groups = list(trend = 1:2, Seasonality=c(3:15)))
+#r$trend
+ plot(r, add.original = TRUE) # Plot the reconstruction
+plot(r, add.residuals = TRUE, add.original = TRUE,
+     plot.method = "xyplot",
+     superpose = TRUE, auto.key = list(columns = 2))
+# 
+
+plot(s, type = "paired", idx = 2:11, plot.contrib = FALSE)
+#print(parestimate(s, groups = list(2:3, 4:5), 
+                #  method = "pairs"))
+plot(wcor(s, groups = 1:30),
+          scales = list(at = c(10, 20, 30)))
+plot(reconstruct(s, groups = list(G12 = 1, G4 = 2:5, 
+                                       G6 = 6:7, G2.4 = 8:9)), 
+     plot.method = "xyplot", layout = c(2, 2), 
+     add.residuals = FALSE, add.original = FALSE)
+
+## score
+
+```
+Computed:
+Eigenvalues: 30,	Eigenvectors: 30,	Factor vectors: 0
+
+## contrst 2 warehouse
+```{r}
+y <- filter(df_day,NEWID==9)
+y$date <- paste(y$year,y$day)
+y1 <- filter(df_day,NEWID==33)
+y1$date <- paste(y1$year,y1$day)
+cons <- inner_join(y1,y,by="date")
+cons1 <- cons[,c(1,8,6,13)]
+```
+
+```{r}
+cons2 <- cons[,c(6,13)]
+norm.cons2n <- sqrt(colMeans(cons2^2))
+cons2n <-sweep(cons2, 2, norm.cons2n, "/")
+L <- 30
+s.cons2n <- ssa(cons2n, L = L, kind = "mssa",svd.method ="svd") ##add method
+s.cons2 <- ssa(cons2, L = L, kind = "mssa")
+length(s.cons2)
+r.cons2n <- reconstruct(s.cons2n, groups = list(Trend = c(1, 12, 14), Seasonality = c(2:11, 13)))
+r.cons2 <- reconstruct(s.cons2, groups = list(Trend = 1, Seasonality = 2:11))
+
+wrap.plot <- function(rec, component = 1, series, ...){
+  plot(rec, add.residuals = FALSE, add.original = TRUE,
+     plot.method = "matplot", superpose = TRUE, 
+     scales = list(y = list(tick.number = 3)), 
+     slice = list(component = component, series = series),
+     auto.key = "",...)}
+#plot(r.cons2n,add.original = TRUE)
+
+trel1 <- wrap.plot(r.cons2n, series = 2, ylab = "2, norm",main = NULL)
+trel2 <- wrap.plot(r.cons2n, series = 1, ylab = "2, norm", main = NULL)
+trel3 <- wrap.plot(r.cons2, series = 2, ylab = "1", main = NULL) 
+trel4 <- wrap.plot(r.cons2, series = 1, ylab = "2", main = NULL)
+
+plot(trel1, split = c(1, 1, 2, 2), more = TRUE)
+plot(trel2, split = c(1, 2, 2, 2), more = TRUE)
+plot(trel3, split = c(2, 1, 2, 2), more = TRUE)
+plot(trel4, split = c(2, 2, 2, 2))
+
+## masanao
+str(s.cons2n)
+dim(s.cons2n$U)
+dim(s.cons2n$V)
+plot(s.cons2n$U[,1] )
+plot(s.cons2n$U[,2] )
+plot(s.cons2n$V[,2] )
+plot(s.cons2n$V[,3] )
+plot(s.cons2n$V[,1] )
+
+```
+
+## SSA-FARY
+```{r}
+actual_daily <- read.csv("~/Desktop/BU-2021fall/MA675-stat pract/partner project/data/actual_daily.csv")
+```
+

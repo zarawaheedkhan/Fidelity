@@ -1,0 +1,124 @@
+---
+title: "EDA5-shuting"
+author: "Shuting Li"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(TSdist)
+library(lubridate)
+library(tibble)
+library(factoextra)
+library(rbenchmark)
+library(autoencoder)
+```
+
+# import data
+```{r}
+actual_daily <- read_csv("~/Desktop/BU-2021fall/partner project/fidelity-github/11.14备份/lst/data/actual_daily.csv")
+actual_daily$date <- as.character(actual_daily$date)
+
+execution_daily <- read.csv("~/Desktop/BU-2021fall/partner project/fidelity-github/11.14备份/lst/data/execution_daily.csv")
+```
+
+# compare execution & actual credit
+
+## loop for 320 warehouses to compute execution & actual credit distance
+```{r}
+actual_daily$date <-as.Date(actual_daily$date)
+execution_daily$date <-as.Date(execution_daily$date)
+
+## Define function to compute distance in a time period
+exe_actual_distance <- function(begin,end,take_log=FALSE){
+  dis_ac_exe <- rep(NA,320)
+  acct_ave <- rep(NA,320)
+  exec_ave <- rep(NA,320)
+  actual_0 <- actual_daily[actual_daily$date >=begin & actual_daily$date<= end,]
+  exe_0 <- execution_daily[execution_daily$date >=begin & execution_daily$date<= end,] 
+  minact<-min(actual_0[actual_0$sum>0,]$sum)
+  minexc<-min(exe_0[exe_0$sum>0,]$sum)
+  for (i in 1:320){
+    if(!take_log){
+      actual <- actual_0[actual_0$NEWID==i,5] 
+      exe <- exe_0[exe_0$NEWID==i,5]
+      acct_ave[i]<-mean(unlist(actual))
+      exec_ave[i]<-mean(unlist(exe))
+      dis_ac_exe[i] <- DTWDistance(actual,exe, window.type="sakoechiba",window.size=1)
+     }
+    else{
+      logactual<-log(actual+minact)
+      logexectut<-log(exe+minexc)  
+      acct_ave[i]<-mean(unlist(logactual))
+      exec_ave[i]<-mean(unlist(logexectut))
+      dis_ac_exe[i] <- DTWDistance(logactual,logexectut, window.type="sakoechiba", window.size=1)
+  }
+  }
+return(data.frame(actual=acct_ave, executed=exec_ave,distance=dis_ac_exe))
+}
+
+
+## add NEWID to output table
+dis_ac_exe_final2 <-exe_actual_distance("2021-03-29","2021-07-04")
+dis_ac_exe_final2 <- data.frame(NEWID=c(1:320),dis_ac_exe_final2)
+
+dis_ac_exe_final_log <-exe_actual_distance("2021-03-29","2021-07-04",TRUE)
+dis_ac_exe_final_log <- data.frame(NEWID=c(1:320),dis_ac_exe_final_log)
+
+## make plot
+par(mfrow=c(1,2))
+plot(log(dis_ac_exe_final2$actual), log(dis_ac_exe_final2$distance), xlab="log_actual", ylab="log_distance")
+plot(log(dis_ac_exe_final2$executed), log(dis_ac_exe_final2$distance), xlab="log_execution", ylab="log_distance")
+
+ggplot(dis_ac_exe_final2)+geom_point()+
+  aes(x=(executed), y=(actual), color=log(distance))+geom_abline(slope=1, intercept=0)+geom_quantile()+scale_x_log10()+scale_y_log10()
+
+ggplot(dis_ac_exe_final2)+geom_point()+
+  aes(x=(executed/actual), y=(distance))+geom_abline(slope=1, intercept=0)+geom_quantile()+scale_x_log10()+scale_y_log10()
+
+```
+log make less influence of gap between exe & act.
+
+## cluster warehouses based on distance between execution and actual credit
+```{r}
+## cluster
+library(pheatmap)
+set.seed(1)
+pheatmap(log(dis_ac_exe_final2[,-1]+1))
+fitres <- pheatmap(log(dis_ac_exe_final2[,-1]+1),kmeans_k = 6)
+fitres$kmeans$cluster 
+
+## add clustering info to original dataset
+df_ac_exe_cluster2 <- cbind(dis_ac_exe_final2, cluster = fitres$kmeans$cluster)
+```
+
+## Validation
+```{r}
+exe_actual_validate_one_warehouse <- function(begin,end,ID1){
+  ac_validate <- actual_daily[actual_daily$NEWID %in% c(ID1),]
+  ac_validate <- ac_validate[ac_validate$date >=begin & ac_validate$date<= end,]
+  exe_validate <- execution_daily[execution_daily$NEWID %in% c(ID1),]
+  exe_validate <- exe_validate[exe_validate$date >=begin & exe_validate$date<= end,]
+  datatemp<- data.frame(date= exe_validate$date, 
+                        actual=ac_validate$sum, execute=exe_validate$sum)
+  acplot <- ggplot(reshape2::melt(datatemp, id="date")) + 
+    geom_line()+aes(x=date,y=value,color=variable)+
+    ylab("credit")+ggtitle(paste("warehouse:",ID1))
+  return(acplot)
+}
+
+## randomly pick one warehouse to check series pattern
+date.start="2021-03-29"
+date.end="2021-07-04"
+gridExtra::grid.arrange(exe_actual_validate_one_warehouse(date.start,date.end,288),
+                        exe_actual_validate_one_warehouse(date.start,date.end,157),
+                        exe_actual_validate_one_warehouse(date.start,date.end,273),
+                        ncol=3)
+```
+
+

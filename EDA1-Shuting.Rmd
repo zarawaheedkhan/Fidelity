@@ -1,0 +1,114 @@
+---
+title: "check data"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+```
+
+## R Markdown
+
+```{r}
+warehouse_credit_cleansed <- read.csv("~/Desktop/BU-2021fall/MA675-stat pract/partner project/fidelity-1/warehouse_credit_cleansed.csv",header = TRUE)
+
+
+#density
+plot(density(warehouse_credit_cleansed$ACTUAL_CREDITS))
+plot(density(warehouse_credit_cleansed$EXECUTION_CREDITS))
+plot(density(warehouse_credit_cleansed$EFFECTIVE_EXECUTION_CREDITS))
+#looks similar, concentrate on 0-1
+```
+
+## 检查warehouse总使用时间
+```{r}
+(warehouse_count <- warehouse_credit_cleansed %>%
+  group_by(WAREHOUSE_NAME) %>%
+  summarise(usage_time=n()))
+warehouse_count <- arrange(warehouse_count,warehouse_count$WAREHOUSE_NAME)
+
+meantime<- length(warehouse_credit_cleansed$WAREHOUSE_NAME)/length(warehouse_count$WAREHOUSE_NAME)
+#ggplot(warehouse_count)+
+  # geom_bar(aes(x=WAREHOUSE_NAME,y=usage_time),stat = "identity")+
+  # geom_hline(aes(yintercept=meantime),col="red")+
+  # scale_y_continuous(breaks = round(sort(c(seq(min(warehouse_count$usage_time), max(warehouse_count$usage_time), length.out=5), meantime)),2))
+
+medtime<- median(warehouse_count$usage_time)
+ggplot(warehouse_count)+
+  geom_bar(aes(x=WAREHOUSE_NAME,y=usage_time),stat = "identity")+
+  geom_hline(aes(yintercept=meantime),col="red")+
+  scale_y_continuous(breaks = round(sort(c(seq(-1000, max(warehouse_count$usage_time), length.out=5), medtime)),2))+
+  labs(title = "warehouse_total_usage_time")
+```
+
+## 检查warehouse的size
+```{r}
+(warehouse_size <- warehouse_credit_cleansed %>%
+  group_by(WAREHOUSE_NAME) %>%
+  summarise(unitcredit=mean(ACTUAL_CREDITS)))
+warehouse_size <- arrange(warehouse_size,warehouse_size$WAREHOUSE_NAME)
+
+meansize <- sum(warehouse_size$unitcredit)/length(warehouse_size$WAREHOUSE_NAME)
+# ggplot(warehouse_size)+
+#   geom_bar(aes(x=WAREHOUSE_NAME,y=unitcredit),stat = "identity")+
+#   geom_hline(aes(yintercept = meansize),col="red")
+
+#ggplot(warehouse_size)+
+  # geom_bar(aes(x=WAREHOUSE_NAME,y=unitcredit),stat = "identity")+
+  # geom_hline(aes(yintercept = meansize),col="red")+
+  # scale_y_continuous(breaks = round(sort(c(seq(min(warehouse_size$unitcredit), max(warehouse_size$unitcredit), length.out=5), meansize)),2))
+  
+medsize <- median(warehouse_size$unitcredit)
+ggplot(warehouse_size)+
+  geom_bar(aes(x=WAREHOUSE_NAME,y=unitcredit),stat = "identity")+
+  geom_hline(aes(yintercept = meansize),col="red")+
+  scale_y_continuous(breaks = round(sort(c(seq(min(warehouse_size$unitcredit), max(warehouse_size$unitcredit), length.out=5), medsize)),2))+
+  labs(title = "Warehouse_unit_actual credit (warehouse size)")
+```
+
+## 按照size从大到小合并，检查不同size warehouse使用频率
+
+```{r}
+warehouse_size1 <- arrange(warehouse_size,desc(unitcredit))
+total <- left_join(warehouse_size1,warehouse_count,by="WAREHOUSE_NAME")
+total <- data.frame(total)
+
+# ggplot(total)+
+#   geom_line(aes(x=WAREHOUSE_NAME,y=n))
+
+ggplot(total)+
+  geom_line(aes(x=unitcredit,y=usage_time))+
+  labs(x="unit_actual_credit (warehouse size)", y="total usage time",title = "usage time for different size")
+
+ggplot(total)+
+  geom_line(aes(x=unitcredit,y=usage_time))+
+  xlim(0,.1)+
+  geom_hline(aes(yintercept=meantime),col="red")+
+  labs(x="unit_actual_credit (warehouse size)", y="total usage time",title = "usage time for different size")
+```
+
+
+## example
+```{r}
+ave_per_warehourse <- warehouse_credit_cleansed %>% 
+  group_by(WAREHOUSE_NAME) %>%
+  transmute(ave_actual=mean(ACTUAL_CREDITS),
+            ave_excution= mean(EXECUTION_CREDITS),
+            ave_eff = mean(EFFECTIVE_EXECUTION_CREDITS)) %>%
+  distinct() %>% 
+  as.data.frame()
+```
+
+
+
+
+
+
+
+
+
+
+
