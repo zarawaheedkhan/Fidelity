@@ -1,0 +1,167 @@
+---
+title: "EDA4"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+
+Computed:
+Eigenvalues: 30,	Eigenvectors: 30,	Factor vectors: 0
+
+
+# Run EDA3.rmd before running this one.
+#### PCA
+
+
+```{r}
+#data format transformation
+#actual<-read.csv('actual_daily.csv')
+#actual1<-cbind(rep(c(1:732),320),actual)
+#names(actual1)[names(actual1) == 'rep(c(1:732), 320)'] <- 'order'
+#actual2<-dcast(actual1[,-2],order~NEWID)
+#actual2
+
+#res.pca <- PCA(actual3[c(650:732),d], graph = FALSE)
+#eig.val <- get_eigenvalue(res.pca)
+#fviz_eig(res.pca, addlabels = TRUE, ylim = c(0, 50))
+#fviz_pca_var(res.pca, col.var = "black")
+#eig.val
+#fviz_pca_ind(res.pca, pointsize = "cos2", 
+#     pointshape = 21, fill = "#E7B800",
+#     repel = TRUE # Avoid text overlapping (slow if many points)
+#)
+```
+
+```{r}
+actual<-read.csv('actual_daily.csv')
+actual1<-cbind(rep(c(1:732),320),actual)
+names(actual1)[names(actual1) == 'rep(c(1:732), 320)'] <- 'order'
+actual2<-dcast(actual1[,-2],NEWID~order)
+```
+
+```{r}
+efficiency<-read.csv('efficiency_daily.csv')
+efficiency1<-efficiency[,c(3,10)]
+efficiency2<-cbind(rep(c(1:732),320),efficiency1)
+names(efficiency2)[names(efficiency2) == 'rep(c(1:732), 320)'] <- 'order'
+efficiency2$efficiency[is.na(efficiency2$efficiency)]<-0
+efficiency2$efficiency[is.infinite(efficiency2$efficiency)]<-0
+efficiency3<-dcast(efficiency2[,],NEWID~order)
+```
+
+
+
+```{r}
+library("FactoMineR")
+library("factoextra")
+actual3<-actual2[,-1]
+a<-apply(efficiency3[c(650:732),],2,function(c)sum(c!=0))
+b<-a/83
+c<-which(b==1)
+d<-unname(c)
+```
+
+
+
+
+
+
+```{r}
+#PCA
+actual3<-actual2[,-1]
+res.pca <- PCA(actual3[,c(650:732)], graph = FALSE)
+eig.val <- get_eigenvalue(res.pca)
+fviz_eig(res.pca, addlabels = TRUE, ylim = c(0, 100))
+fviz_pca_var(res.pca, col.var = "black")
+eig.val
+```
+```{r}
+res.pca$svd$V[,2]
+```
+
+```{r}
+fviz_pca_ind(res.pca,  
+     pointshape = 21, fill = "#E7B800",
+     repel = T,
+    # Avoid text overlapping
+)
+```
+
+```{r}
+a<-fviz_pca_ind(res.pca,  
+     pointshape = 21, fill = "#E7B800",
+     repel = T,
+    # Avoid text overlapping
+)
+b<-a$data
+c<-as.matrix(data.frame(b$x,b$y))
+fviz_nbclust(c,kmeans,method = 'wss')+geom_vline(xintercept = 4,linetype=2)
+cluster<-kmeans(c[-9,-9],4,25)
+table(cluster$cluster)
+fviz_cluster(cluster,data=c[-9,-9])
+```
+
+```{r}
+plot(c(1:83),actual3[287,][650:732],type = 'l')
+lines(c(1:83),actual3[213,][650:732],type = 'l',col='red')
+lines(c(1:83),actual3[98,][650:732],type = 'l',col='green')
+lines(c(1:83),actual3[288,][650:732],type = 'l',col='blue')
+```
+
+```{r}
+ev<-res.pca$svd
+ev2<-ev$U[,c(1,2)]
+ev2<-scale(ev2)
+plot(ev2[,1],ev2[,2])
+ev2[274,]
+```
+
+```{r}
+fviz_pca_ind(res.pca,  
+     pointshape = 21, fill = "#E7B800",
+     repel = T,
+     xlim=c(-10,10)# Avoid text overlapping (slow if many points)
+)
+```
+
+```{r}
+fviz_pca_ind(res.pca,  
+     pointshape = 21, fill = "#E7B800",
+     repel = T,
+     xlim=c(-2,2)# Avoid text overlapping (slow if many points)
+)
+```
+
+```{r}
+efficiency4<-efficiency3[,-1]
+res.pca <- PCA(efficiency4[,c(600:732)], graph = FALSE)
+eig.val <- get_eigenvalue(res.pca)
+fviz_eig(res.pca, addlabels = TRUE, ylim = c(0, 100))
+fviz_pca_var(res.pca, col.var = "black")
+eig.val
+```
+
+
+```{r}
+fviz_pca_ind(res.pca,  
+     pointshape = 21, fill = "#E7B800",
+     repel = T,
+    # Avoid text overlapping (slow if many points)
+)
+```
+```{r}
+plot(c(1:83),efficiency4[83,][650:732],type = 'l',ylim=c(-3.5,5))
+lines(c(1:83),efficiency4[106,][650:732],type = 'l',col='red')
+lines(c(1:83),efficiency4[184,][650:732],type = 'l',col='green')
+lines(c(1:83),efficiency4[168,][650:732],type = 'l',col='blue')
+```
+
+```{r}
+
+res.pca$svd$V[,2]
+```
+

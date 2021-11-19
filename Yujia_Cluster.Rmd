@@ -1,0 +1,318 @@
+---
+title: "Yujia_Cluster"
+author: "Yujia_Wang"
+date: "11/14/2021"
+output: html_document
+---
+
+```{r,message=FALSE}
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+
+library(TSdist) # open XQuartz
+#https://cran.r-project.org/web/packages/TSdist/TSdist.pdf
+#https://journal.r-project.org/archive/2016/RJ-2016-058/RJ-2016-058.pdf
+
+library(lubridate)
+library(tibble)
+library(factoextra)
+library(rbenchmark)
+```
+
+```{r,message=FALSE}
+source("Input_Zeros.R") # input the data
+
+efficiency <- (actual_daily$sum+1) / (execution_daily$sum+1)
+efficiency <- log(efficiency)
+efficiency <- as.data.frame(efficiency)
+
+efficiency_daily <- data.frame(actual_daily$NEWID,actual_daily$date,efficiency)
+colnames(efficiency_daily) <- c("NEWID","date","sum")
+#efficiency_daily <- efficiency_daily %>% mutate(sum = replace(sum, sum == "NaN", 0))
+```
+
+
+
+##### DTW method (Shape based distances)
+```{r}
+dtw_function <- function(x,begin_date,end_date){
+  # change date column into date format
+  x$date <-as.Date(x$date)
+  # select the time range
+  x <- x[x$date >=begin_date & x$date<= end_date,]
+  # select the number of warehouse from 1 to 320 ????
+  # x <- x[x$NEWID<=warehouse_number,]
+  # Get ready for time series matrix: each row represent each warehouse, each column represnts one time spot
+  id_x <- unique(x$NEWID)
+  x <- split(x$sum, x$NEWID) %>% unlist()
+  x <- matrix(x,nrow = length(id_x))
+  # calcaute the time series distance 
+  # The choice of window.size means how much the mapping (small adjustment?)
+  da = dist(x, method="TSDistances", distance="dtw",window.size=7, diag=TRUE, upper=TRUE)
+  da <- as.data.frame(as.matrix(da))
+  row.names(da) <- unique(id_x)
+  return(da)
+}
+# find dtw matrix
+
+# result <- dtw_function(actual_daily,"2021-03-29","2021-07-04",320)
+result1 <- dtw_function(efficiency_daily,"2021-03-29","2021-07-04")
+```
+
+### K-mean cluster
+```{r}
+# Different cluster method: K-mean cluster, hierarchical cluster
+# choose the centers manually
+k1 <- kmeans(result1, centers =3, nstart = 25)
+fviz_cluster(k1, data = result1)
+```
+
+```{r}
+# function to compute total within-cluster sum of square 
+wss <- function(k) {
+  kmeans(result1, k, nstart = 25)$tot.withinss
+}
+# Compute and plot wss for k = 1 to k = 5
+k.values <- 1:5
+# extract wss for 2-15 clusters
+wss_values <- map_dbl(k.values, wss)
+# plot to find the best cluster number 
+plot(k.values, wss_values,
+       type="b", pch = 19, frame = FALSE, 
+       xlab="Number of clusters K",
+       ylab="Total within-clusters sum of squares")
+#https://www.datanovia.com/en/lessons/k-means-clustering-in-r-algorith-and-practical-examples/
+```
+
+```{r}
+# delete cluster3
+#efficiency_daily_delete <- subset(efficiency_daily,NEWID!="18"&NEWID!="39"&NEWID!="182"&NEWID!="247"&NEWID!="296")
+
+#result2 <- dtw_function(efficiency_daily_delete,"2021-03-29","2021-07-04")
+
+# cluster again
+#k2 <- kmeans(result2, centers = 3, nstart = 25)
+#fviz_cluster(k2, data = result2)
+```
+
+### hierarchical cluster
+```{r}
+# plot(hclust(result_b)) -- PS. doesn't work for dataframe
+hclustfunc <- function(x) hclust(x, method="complete")
+distfunc <- function(x) as.dist((1-cor(t(x)))/2)
+dist <- distfunc(result1)
+fit <- hclustfunc(dist)
+plot(fit)
+
+# No need for changing k
+fit <- cmdscale(result1,eig=TRUE, k=2)
+x <- fit$points[,1]
+y <- fit$points[,2]
+# Project the distance matrix to 2D plot. 
+plot(x, y, xlab="Coordinate 1", ylab="Coordinate 2",
+  main="Metric MDS")
+```
+
+
+
+##### TQuest method (Feature-based distances)(Computes the Tquest distance between a pair of numeric vectors.)
+```{r}
+dtw_function <- function(x,begin_date,end_date){
+  x$date <-as.Date(x$date)
+  x <- x[x$date >=begin_date & x$date<= end_date,]
+  id_x <- unique(x$NEWID)
+  x <- split(x$sum, x$NEWID) %>% unlist()
+  x <- matrix(x,nrow = length(id_x))
+  da = dist(x, method="TSDistances", distance="tquest", tau=mean(x), diag=TRUE, upper=TRUE)
+  da <- as.data.frame(as.matrix(da))
+  row.names(da) <- unique(id_x)
+  return(da)
+}
+
+result3 <- dtw_function(efficiency_daily,"2021-03-29","2021-07-04")
+```
+
+### K-mean cluster
+```{r}
+# Different cluster method: K-mean cluster, hierarchical cluster
+# choose the centers manually
+k3 <- kmeans(result3, centers =3, nstart = 25)
+fviz_cluster(k3, data = result3)
+```
+
+```{r}
+# delete cluster3
+#efficiency_daily_delete2 <- subset(efficiency_daily,NEWID!="49"&NEWID!="246")
+
+#result4 <- dtw_function(efficiency_daily_delete2,"2021-03-29","2021-07-04")
+
+# cluster again
+#k4 <- kmeans(result4, centers = 3, nstart = 25)
+#Zfviz_cluster(k4, data = result4)
+```
+
+### hierarchical cluster
+```{r}
+# plot(hclust(result_b)) -- PS. doesn't work for dataframe
+hclustfunc <- function(x) hclust(x, method="complete")
+distfunc <- function(x) as.dist((1-cor(t(x)))/2)
+dist <- distfunc(result3)
+fit <- hclustfunc(dist)
+plot(fit)
+
+# No need for changing k
+fit <- cmdscale(result1,eig=TRUE, k=2)
+x <- fit$points[,1]
+y <- fit$points[,2]
+# Project the distance matrix to 2D plot. 
+plot(x, y, xlab="Coordinate 1", ylab="Coordinate 2",
+  main="Metric MDS")
+```
+
+```{r}
+# select warehouse
+efficiency_daily$date <-as.Date(efficiency_daily$date)
+
+a <- efficiency_daily %>% 
+  filter(NEWID==315) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+b <- efficiency_daily %>% 
+  filter(NEWID==269) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+c <- efficiency_daily %>% 
+  filter(NEWID==147) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+d <- efficiency_daily %>% 
+  filter(NEWID==216) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+e <- efficiency_daily %>% 
+  filter(NEWID==107) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+f <- efficiency_daily %>% 
+  filter(NEWID==111) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+plot <- as.data.frame(cbind(c(1:98),a$sum,b$sum,c$sum,d$sum,e$sum,f$sum))
+ggplot(plot, aes(x=V1,y = V2)) +
+    geom_line(aes(x = V1, y = V2), color = 'red') +
+    geom_line(aes(x = V1, y = V3), color = 'red') +
+    geom_line(aes(x = V1, y = V4), color = 'sky blue') +
+    geom_line(aes(x = V1, y = V5), color = 'sky blue') +
+    geom_line(aes(x = V1, y = V6), color = 'orange') +
+    geom_line(aes(x = V1, y = V7), color = 'orange') +
+    labs(x='Date',y='Efficiency',title='Pattern of warehouse in Mar 29 to Jul 4 in 2021') 
+
+#c <- actual_daily %>% filter(!NEWID %in% c(48,1,2,47,46,45))
+#d <- actual_daily %>% filter(NEWID %in% c(1:20))
+
+a <- efficiency_daily %>% 
+  filter(NEWID==240) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+b <- efficiency_daily %>% 
+  filter(NEWID==305) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+c <- efficiency_daily %>% 
+  filter(NEWID==179) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+d <- efficiency_daily %>% 
+  filter(NEWID==120) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+e <- efficiency_daily %>% 
+  filter(NEWID==26) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+f <- efficiency_daily %>% 
+  filter(NEWID==49) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+plot <- as.data.frame(cbind(c(1:98),a$sum,b$sum,c$sum,d$sum,e$sum,f$sum))
+ggplot(plot, aes(x=V1,y = V2)) +
+    geom_line(aes(x = V1, y = V2), color = 'orange') +
+    geom_line(aes(x = V1, y = V3), color = 'orange') +
+    geom_line(aes(x = V1, y = V4), color = 'red') +
+    geom_line(aes(x = V1, y = V5), color = 'red') +
+    geom_line(aes(x = V1, y = V6), color = 'sky blue') +
+    geom_line(aes(x = V1, y = V7), color = 'sky blue') +
+    labs(x='Date',y='Efficiency',title='Pattern of warehouse in Mar 29 to Jul 4 in 2021') 
+```
+
+
+```{r}
+a <- efficiency_daily %>% 
+  filter(NEWID==315) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+b <- efficiency_daily %>% 
+  filter(NEWID==269) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+plot <- as.data.frame(cbind(c(1:98),a$sum,b$sum))
+ggplot(plot, aes(x=V1,y = V2)) +
+    geom_line(aes(x = V1, y = V2), color = 'red') +
+    geom_line(aes(x = V1, y = V3), color = 'red')
+    labs(x='Date',y='Efficiency',title='Pattern of warehouse in Mar 29 to Jul 4 in 2021')
+
+c <- efficiency_daily %>% 
+  filter(NEWID==147) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+d <- efficiency_daily %>% 
+  filter(NEWID==216) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+plot <- as.data.frame(cbind(c(1:98),c$sum,d$sum))
+ggplot(plot, aes(x=V1,y = V2)) +
+    geom_line(aes(x = V1, y = V2), color = 'sky blue') +
+    geom_line(aes(x = V1, y = V3), color = 'sky blue') 
+    labs(x='Date',y='Efficiency',title='Pattern of warehouse in Mar 29 to Jul 4 in 2021') 
+
+e <- efficiency_daily %>% 
+  filter(NEWID==107) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+f <- efficiency_daily %>% 
+  filter(NEWID==111) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+plot <- as.data.frame(cbind(c(1:98),e$sum,f$sum))
+ggplot(plot, aes(x=V1,y = V2)) +
+    geom_line(aes(x = V1, y = V2), color = 'orange') +
+    geom_line(aes(x = V1, y = V3), color = 'orange')
+    labs(x='Date',y='Efficiency',title='Pattern of warehouse in Mar 29 to Jul 4 in 2021') 
+
+    
+a <- efficiency_daily %>% 
+  filter(NEWID==240) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+b <- efficiency_daily %>% 
+  filter(NEWID==305) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+plot <- as.data.frame(cbind(c(1:98),a$sum,b$sum))
+ggplot(plot, aes(x=V1,y = V2)) +
+    geom_line(aes(x = V1, y = V2), color = 'red') +
+    geom_line(aes(x = V1, y = V3), color = 'red')
+    labs(x='Date',y='Efficiency',title='Pattern of warehouse in Mar 29 to Jul 4 in 2021')
+
+c <- efficiency_daily %>% 
+  filter(NEWID==179) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+d <- efficiency_daily %>% 
+  filter(NEWID==120) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+plot <- as.data.frame(cbind(c(1:98),c$sum,d$sum))
+ggplot(plot, aes(x=V1,y = V2)) +
+    geom_line(aes(x = V1, y = V2), color = 'sky blue') +
+    geom_line(aes(x = V1, y = V3), color = 'sky blue') 
+    labs(x='Date',y='Efficiency',title='Pattern of warehouse in Mar 29 to Jul 4 in 2021') 
+
+e <- efficiency_daily %>% 
+  filter(NEWID==26) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+f <- efficiency_daily %>% 
+  filter(NEWID==49) %>%
+  filter(date>= "2021-03-29" & date <="2021-07-04")
+plot <- as.data.frame(cbind(c(1:98),e$sum,f$sum))
+ggplot(plot, aes(x=V1,y = V2)) +
+    geom_line(aes(x = V1, y = V2), color = 'orange') +
+    geom_line(aes(x = V1, y = V3), color = 'orange')
+    labs(x='Date',y='Efficiency',title='Pattern of warehouse in Mar 29 to Jul 4 in 2021') 
+
+```
+
+
+
+
+
